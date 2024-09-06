@@ -53,6 +53,7 @@ function App() {
     }
   }, [isWebcamActive]);
 
+  // Função para detectar e desenhar landmarks
   const detectHands = async () => {
     if (!handLandmarker) return;
 
@@ -118,6 +119,31 @@ function App() {
 
     processFrame();
   };
+
+  // Função para salvar o frame como imagem ao pressionar a tecla 'S'
+  const saveFrameAsImage = () => {
+    const canvas = canvasRef.current;
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL();  // Converte o canvas para imagem PNG
+    link.download = `Open/frame_${Date.now()}.png`;  // Nome do arquivo baseado no timestamp atual
+    link.click();  // Simula o clique para baixar a imagem
+  };
+
+  // Hook para capturar o evento de pressionar a tecla 'S'
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      if (event.key === 's' || event.key === 'S') {
+        saveFrameAsImage();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+
+    // Limpar o event listener ao desmontar o componente
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, []);
 
   return (
     <div
