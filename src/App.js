@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { HandLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
+import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
 function App() {
   const [isWebcamActive, setWebcamActive] = useState(false);
@@ -15,8 +15,8 @@ function App() {
       );
       const handLandmarker = await HandLandmarker.createFromOptions(vision, {
         baseOptions: {
-          modelAssetPath:
-            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+          delegate: "GPU",
         },
         runningMode: "VIDEO",
         numHands: 2,
@@ -34,8 +34,17 @@ function App() {
         .getUserMedia({ video: true })
         .then((stream) => {
           videoRef.current.srcObject = stream;
+
           videoRef.current.onloadeddata = () => {
-            detectHands();
+            // Verificar as dimensões do vídeo e do canvas
+            console.log('Video dimensions:', videoRef.current.videoWidth, videoRef.current.videoHeight);
+
+            if (videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
+              canvasRef.current.width = videoRef.current.videoWidth;
+              canvasRef.current.height = videoRef.current.videoHeight;
+
+              detectHands();
+            }
           };
         })
         .catch((err) => {
@@ -51,18 +60,20 @@ function App() {
     const video = videoRef.current;
     const ctx = canvas.getContext("2d");
 
-    // Configurar o canvas para ter o mesmo tamanho do vídeo
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const HAND_CONNECTIONS = [
+      [0, 1], [1, 2], [2, 3], [3, 4], // Polegar
+      [0, 5], [5, 6], [6, 7], [7, 8], // Dedo indicador
+      [5, 9], [9, 10], [10, 11], [11, 12], // Dedo médio
+      [9, 13], [13, 14], [14, 15], [15, 16], // Dedo anelar
+      [13, 17], [17, 18], [18, 19], [19, 20] // Dedo mínimo
+    ];
 
-    // Função para desenhar a detecção no canvas
     const drawLandmarks = (landmarks) => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "red";
-      ctx.strokeStyle = "white";
+      ctx.strokeStyle = "green";
       ctx.lineWidth = 2;
 
+      // Desenhar os pontos dos landmarks
       landmarks.forEach((landmark) => {
         const x = landmark.x * canvas.width;
         const y = landmark.y * canvas.height;
@@ -70,14 +81,38 @@ function App() {
         ctx.arc(x, y, 5, 0, 2 * Math.PI);
         ctx.fill();
       });
+
+      // Desenhar as conexões entre os pontos
+      ctx.strokeStyle = "green";
+      HAND_CONNECTIONS.forEach(([start, end]) => {
+        const xStart = landmarks[start].x * canvas.width;
+        const yStart = landmarks[start].y * canvas.height;
+        const xEnd = landmarks[end].x * canvas.width;
+        const yEnd = landmarks[end].y * canvas.height;
+
+        ctx.beginPath();
+        ctx.moveTo(xStart, yStart);
+        ctx.lineTo(xEnd, yEnd);
+        ctx.stroke();
+      });
     };
 
     const processFrame = async () => {
       if (!handLandmarker) return;
       const hands = await handLandmarker.detectForVideo(video, Date.now());
+
+      // Limpar o canvas para cada novo frame
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Desenhar o vídeo como fundo
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Desenhar landmarks para todas as mãos detectadas
       if (hands.landmarks.length > 0) {
-        drawLandmarks(hands.landmarks[0]);
+        hands.landmarks.forEach((landmarks) => {
+          drawLandmarks(landmarks);  // Desenhar landmarks de cada mão
+        });
       }
+
       requestAnimationFrame(processFrame);
     };
 
