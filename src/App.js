@@ -1,11 +1,14 @@
 import React, { useState, useRef, useEffect } from "react";
 import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
+import * as tf from '@tensorflow/tfjs';
 
 function App() {
   const [isWebcamActive, setWebcamActive] = useState(false);
   const [handLandmarker, setHandLandmarker] = useState(null);
+  const [gesturePrediction, setGesturePrediction] = useState(""); // Armazenar a predição do gesto
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const modelRef = useRef(null); // Referência ao modelo
 
   // Função para iniciar o MediaPipe Hand Landmarker
   useEffect(() => {
@@ -24,7 +27,14 @@ function App() {
       setHandLandmarker(handLandmarker);
     };
 
+    // Carregar o modelo do TensorFlow.js
+    const loadModel = async () => {
+      const model = await tf.loadLayersModel('/model_tfjs/model.json');
+      modelRef.current = model;
+    };
+
     initializeHandLandmarker();
+    loadModel(); // Carregar o modelo ao iniciar
   }, []);
 
   // Ativar webcam e aplicar o modelo Hand Landmarker
@@ -37,8 +47,6 @@ function App() {
 
           videoRef.current.onloadeddata = () => {
             // Verificar as dimensões do vídeo e do canvas
-            console.log('Video dimensions:', videoRef.current.videoWidth, videoRef.current.videoHeight);
-
             if (videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
               canvasRef.current.width = videoRef.current.videoWidth;
               canvasRef.current.height = videoRef.current.videoHeight;
@@ -53,7 +61,7 @@ function App() {
     }
   }, [isWebcamActive]);
 
-  // Função para detectar e desenhar landmarks
+  // Função para detectar mãos e fazer predições de gestos
   const detectHands = async () => {
     if (!handLandmarker) return;
 
@@ -98,6 +106,17 @@ function App() {
       });
     };
 
+    const predictGesture = async (frame) => {
+      if (!modelRef.current) return;
+
+      const imgTensor = tf.browser.fromPixels(frame).resizeNearestNeighbor([224, 224]).expandDims(0).div(255.0);
+      const predictions = await modelRef.current.predict(imgTensor).data();
+      const gestureIndex = predictions.indexOf(Math.max(...predictions));
+
+      const gestures = ["FingerUp", "Open", "Grip"];
+      setGesturePrediction(gestures[gestureIndex]); // Atualiza a predição
+    };
+
     const processFrame = async () => {
       if (!handLandmarker) return;
       const hands = await handLandmarker.detectForVideo(video, Date.now());
@@ -114,36 +133,14 @@ function App() {
         });
       }
 
+      // Fazer a predição do gesto usando o frame atual
+      predictGesture(video);
+
       requestAnimationFrame(processFrame);
     };
 
     processFrame();
   };
-
-  // Função para salvar o frame como imagem ao pressionar a tecla 'S'
-  const saveFrameAsImage = () => {
-    const canvas = canvasRef.current;
-    const link = document.createElement('a');
-    link.href = canvas.toDataURL();  // Converte o canvas para imagem PNG
-    link.download = `Open/frame_${Date.now()}.png`;  // Nome do arquivo baseado no timestamp atual
-    link.click();  // Simula o clique para baixar a imagem
-  };
-
-  // Hook para capturar o evento de pressionar a tecla 'S'
-  useEffect(() => {
-    const handleKeyPress = (event) => {
-      if (event.key === 's' || event.key === 'S') {
-        saveFrameAsImage();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-
-    // Limpar o event listener ao desmontar o componente
-    return () => {
-      window.removeEventListener('keydown', handleKeyPress);
-    };
-  }, []);
 
   return (
     <div
@@ -187,6 +184,10 @@ function App() {
               height: "auto",
             }}
           />
+          {/* Exibir a predição do gesto */}
+          <div style={{ position: "absolute", top: 10, left: 10, color: "white", fontSize: "24px" }}>
+            Predição do Gesto: {gesturePrediction}
+          </div>
         </>
       )}
     </div>

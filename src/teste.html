@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Carregamento do Modelo</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+</head>
+<body>
+    <h1>Teste de Carregamento de Modelo TensorFlow.js</h1>
+    <script>
+        async function loadModel() {
+            try {
+                // Substitua o caminho abaixo pelo local correto do arquivo model.json
+                const model = await tf.loadLayersModel('http://localhost:8080/model_tfjs/model.json');
+                console.log("Modelo carregado com sucesso!");
+                console.log(model);  // Mostra detalhes do modelo carregado no console
+            } catch (error) {
+                console.error("Erro ao carregar o modelo:", error);
+            }
+        }
+
+        // Chama a função de carregamento do modelo
+        loadModel();
+    </script>
+</body>
+</html>
