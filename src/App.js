@@ -111,10 +111,11 @@ function App() {
 
       const imgTensor = tf.browser.fromPixels(frame).resizeNearestNeighbor([224, 224]).expandDims(0).div(255.0);
       const predictions = await modelRef.current.predict(imgTensor).data();
+      // console.log("Predictions:", predictions);  // Verifique as probabilidades
       const gestureIndex = predictions.indexOf(Math.max(...predictions));
 
-      const gestures = ["FingerUp", "Open", "Grip"];
-      setGesturePrediction(gestures[gestureIndex]); // Atualiza a predição
+      const gestures = ["FingerUp", "Open", "Grip", "NoHands"];
+      setGesturePrediction(gestures[gestureIndex]);
     };
 
     const processFrame = async () => {
