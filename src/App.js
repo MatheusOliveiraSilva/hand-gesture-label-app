@@ -6,9 +6,12 @@ function App() {
   const [isWebcamActive, setWebcamActive] = useState(false);
   const [handLandmarker, setHandLandmarker] = useState(null);
   const [gesturePrediction, setGesturePrediction] = useState(""); // Armazenar a predição do gesto
+  const [logoPosition, setLogoPosition] = useState({ x: 100, y: 100 }); // Posição inicial do brasão
+  const [isDragging, setIsDragging] = useState(false); // Controle de drag-and-drop
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const modelRef = useRef(null); // Referência ao modelo
+  const logoRef = useRef(null); // Referência ao elemento do brasão
 
   // Função para iniciar o MediaPipe Hand Landmarker
   useEffect(() => {
@@ -111,11 +114,10 @@ function App() {
 
       const imgTensor = tf.browser.fromPixels(frame).resizeNearestNeighbor([224, 224]).expandDims(0).div(255.0);
       const predictions = await modelRef.current.predict(imgTensor).data();
-      // console.log("Predictions:", predictions);  // Verifique as probabilidades
       const gestureIndex = predictions.indexOf(Math.max(...predictions));
 
       const gestures = ["FingerUp", "Open", "Grip"];
-      setGesturePrediction(gestures[gestureIndex]);
+      setGesturePrediction(gestures[gestureIndex]); // Atualiza a predição
     };
 
     const processFrame = async () => {
@@ -143,17 +145,42 @@ function App() {
     processFrame();
   };
 
+  // Funções de Drag-and-Drop para o brasão
+  const startDrag = (e) => {
+    setIsDragging(true);
+  };
+
+  const handleDrag = (e) => {
+    if (isDragging) {
+      setLogoPosition({
+        x: e.clientX - 50, // Ajuste para centralizar o brasão no cursor
+        y: e.clientY - 50,
+      });
+    }
+  };
+
+  const endDrag = () => {
+    setIsDragging(false);
+  };
+
   return (
-    <div
-      style={{
-        height: "100vh",
-        backgroundColor: "black",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        position: "relative",
-      }}
-    >
+    <div style={{ position: 'relative', height: '100vh', width: '100vw' }} onMouseMove={handleDrag} onMouseUp={endDrag}>
+      {/* Header azul marinho */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        width: '100%',
+        backgroundColor: '#003366',  // Azul marinho
+        color: 'white',
+        textAlign: 'center',
+        padding: '10px',
+        fontSize: '24px',
+        zIndex: 10
+      }}>
+        Fingers Landmarking and Understanding Pose Estimation - F.L.U.P.S
+      </div>
+
+      {/* Vídeo ocupando toda a tela */}
       {!isWebcamActive ? (
         <button
           onClick={() => setWebcamActive(true)}
@@ -165,6 +192,11 @@ function App() {
             color: "white",
             border: "none",
             borderRadius: "8px",
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            zIndex: 10
           }}
         >
           Autorizar Webcam
@@ -175,20 +207,55 @@ function App() {
             ref={videoRef}
             autoPlay
             style={{
-              display: "none",
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover', // Faz o vídeo cobrir toda a tela
+              zIndex: 1
             }}
           />
           <canvas
             ref={canvasRef}
             style={{
-              width: "80%",
-              height: "auto",
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              zIndex: 2  // O canvas sobrepõe o vídeo
             }}
           />
           {/* Exibir a predição do gesto */}
-          <div style={{ position: "absolute", top: 10, left: 10, color: "white", fontSize: "24px" }}>
+          <div style={{
+            position: "absolute",
+            top: "60px",  // Um pouco abaixo do header
+            left: "10px",
+            color: "white",
+            fontSize: "24px",
+            zIndex: 10
+          }}>
             Predição do Gesto: {gesturePrediction}
           </div>
+
+          {/* Brasão PUC-Rio com Drag-and-Drop */}
+          <img
+            ref={logoRef}
+            src="/logo192.png" // Certifique-se de que o caminho para a imagem está correto
+            alt="Brasão PUC-Rio"
+            style={{
+              position: "absolute",
+              top: `${logoPosition.y}px`,
+              left: `${logoPosition.x}px`,
+              width: "100px",
+              height: "100px",
+              cursor: isDragging ? "grabbing" : "grab", // Muda o cursor quando estiver arrastando
+              zIndex: 11
+            }}
+            onMouseDown={startDrag}
+            onMouseUp={endDrag}
+          />
         </>
       )}
     </div>
