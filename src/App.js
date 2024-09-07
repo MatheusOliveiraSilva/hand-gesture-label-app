@@ -114,7 +114,7 @@ function App() {
       // console.log("Predictions:", predictions);  // Verifique as probabilidades
       const gestureIndex = predictions.indexOf(Math.max(...predictions));
 
-      const gestures = ["FingerUp", "Open", "Grip", "NoHands"];
+      const gestures = ["FingerUp", "Open", "Grip"];
       setGesturePrediction(gestures[gestureIndex]);
     };
 
