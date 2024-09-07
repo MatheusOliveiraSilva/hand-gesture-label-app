@@ -242,7 +242,7 @@ function App() {
           {/* Brasão PUC-Rio com Drag-and-Drop */}
           <img
             ref={logoRef}
-            src="/logo192.png" // Certifique-se de que o caminho para a imagem está correto
+            src="/image-asset.png" // Certifique-se de que o caminho para a imagem está correto
             alt="Brasão PUC-Rio"
             style={{
               position: "absolute",
