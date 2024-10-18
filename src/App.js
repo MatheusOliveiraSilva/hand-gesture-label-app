@@ -175,9 +175,9 @@ function App() {
         textAlign: 'center',
         padding: '10px',
         fontSize: '24px',
-        zIndex: 10
+        zIndex: 10 // Fingers Landmarking and Understanding Pose Estimation - F.L.U.P.S
       }}>
-        Fingers Landmarking and Understanding Pose Estimation - F.L.U.P.S
+        INF - 2473
       </div>
 
       {/* Vídeo ocupando toda a tela */}
