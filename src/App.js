@@ -4,13 +4,17 @@ import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@m
 function App() {
   const [isWebcamActive, setWebcamActive] = useState(false);
   const [handLandmarker, setHandLandmarker] = useState(null);
-  const [logoPosition, setLogoPosition] = useState({ x: 100, y: 100 }); // Posição inicial do brasão
-  const [isDragging, setIsDragging] = useState(false); // Controle de drag-and-drop
+  const [isDragging, setIsDragging] = useState(false); // Controle do estado de arraste
+  const [indicatorPosition, setIndicatorPosition] = useState({ x: 0, y: 0 }); // Posição da bolinha/indicador
+  const [iconVisible, setIconVisible] = useState(true); // Controle da visibilidade do ícone
+  const [iconPosition, setIconPosition] = useState({ x: 200, y: 200 }); // Posição inicial do ícone
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const logoRef = useRef(null); // Referência ao elemento do brasão
+  const iconRef = useRef(null);
 
-  // Função para iniciar o MediaPipe Hand Landmarker
+  const SENSITIVITY = 1.8;
+  const OFFSET = -30;
+
   useEffect(() => {
     const initializeHandLandmarker = async () => {
       const vision = await FilesetResolver.forVisionTasks(
@@ -23,7 +27,7 @@ function App() {
           delegate: "GPU",
         },
         runningMode: "VIDEO",
-        numHands: 2,
+        numHands: 1,
       });
       setHandLandmarker(handLandmarker);
     };
@@ -31,7 +35,6 @@ function App() {
     initializeHandLandmarker();
   }, []);
 
-  // Ativar webcam e aplicar o modelo Hand Landmarker
   useEffect(() => {
     if (isWebcamActive && videoRef.current) {
       navigator.mediaDevices
@@ -54,7 +57,6 @@ function App() {
     }
   }, [isWebcamActive]);
 
-  // Função para detectar mãos e desenhar landmarks
   const detectHands = async () => {
     if (!handLandmarker) return;
 
@@ -62,51 +64,16 @@ function App() {
     const video = videoRef.current;
     const ctx = canvas.getContext("2d");
 
-    const HAND_CONNECTIONS = [
-      [0, 1], [1, 2], [2, 3], [3, 4], // Polegar
-      [0, 5], [5, 6], [6, 7], [7, 8], // Dedo indicador
-      [5, 9], [9, 10], [10, 11], [11, 12], // Dedo médio
-      [9, 13], [13, 14], [14, 15], [15, 16], // Dedo anelar
-      [13, 17], [17, 18], [18, 19], [19, 20] // Dedo mínimo
-    ];
-
-    const drawLandmarks = (landmarks) => {
-      ctx.fillStyle = "red";
-      ctx.strokeStyle = "green";
-      ctx.lineWidth = 2;
-
-      landmarks.forEach((landmark) => {
-        const x = landmark.x * canvas.width;
-        const y = landmark.y * canvas.height;
-        ctx.beginPath();
-        ctx.arc(x, y, 5, 0, 2 * Math.PI);
-        ctx.fill();
-      });
-
-      HAND_CONNECTIONS.forEach(([start, end]) => {
-        const xStart = landmarks[start].x * canvas.width;
-        const yStart = landmarks[start].y * canvas.height;
-        const xEnd = landmarks[end].x * canvas.width;
-        const yEnd = landmarks[end].y * canvas.height;
-
-        ctx.beginPath();
-        ctx.moveTo(xStart, yStart);
-        ctx.lineTo(xEnd, yEnd);
-        ctx.stroke();
-      });
-    };
-
     const processFrame = async () => {
-      if (!handLandmarker) return;
       const hands = await handLandmarker.detectForVideo(video, Date.now());
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       if (hands.landmarks.length > 0) {
-        hands.landmarks.forEach((landmarks) => {
-          drawLandmarks(landmarks);
-        });
+        const landmarks = hands.landmarks[0];
+        detectPose(landmarks);
+        drawLandmarks(ctx, landmarks);
       }
 
       requestAnimationFrame(processFrame);
@@ -115,26 +82,58 @@ function App() {
     processFrame();
   };
 
-  // Funções de Drag-and-Drop para o brasão
-  const startDrag = () => {
-    setIsDragging(true);
-  };
+  const detectPose = (landmarks) => {
+    const [thumbTip, indexTip] = [landmarks[4], landmarks[8]];
 
-  const handleDrag = (e) => {
-    if (isDragging) {
-      setLogoPosition({
-        x: e.clientX - 50,
-        y: e.clientY - 50,
-      });
+    moveIndicator(indexTip);
+
+    const gripDistance = Math.hypot(
+      thumbTip.x - indexTip.x,
+      thumbTip.y - indexTip.y
+    );
+    const isGrip = gripDistance < 0.05;
+
+    const iconRect = iconRef.current.getBoundingClientRect();
+    const isOverIcon =
+      indicatorPosition.x >= iconRect.left &&
+      indicatorPosition.x <= iconRect.right &&
+      indicatorPosition.y >= iconRect.top &&
+      indicatorPosition.y <= iconRect.bottom;
+
+    if (isGrip && isOverIcon) {
+      setIsDragging(true);
+      setIconVisible(false);
+    } else if (!isGrip && isDragging) {
+      setIsDragging(false);
+      setIconPosition(indicatorPosition);
+      setIconVisible(true);
     }
   };
 
-  const endDrag = () => {
-    setIsDragging(false);
+  const moveIndicator = (landmark) => {
+    const canvas = canvasRef.current;
+    const newX = landmark.x * canvas.width * SENSITIVITY;
+    const newY = (landmark.y * canvas.height * SENSITIVITY) + OFFSET;
+
+    setIndicatorPosition({ x: newX, y: newY });
+  };
+
+  const drawLandmarks = (ctx, landmarks) => {
+    ctx.fillStyle = "red";
+    ctx.strokeStyle = "green";
+    ctx.lineWidth = 2;
+
+    landmarks.forEach((landmark) => {
+      const x = landmark.x * ctx.canvas.width;
+      const y = landmark.y * ctx.canvas.height;
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, 2 * Math.PI);
+      ctx.fill();
+    });
   };
 
   return (
-    <div style={{ position: "relative", height: "100vh", width: "100vw" }} onMouseMove={handleDrag} onMouseUp={endDrag}>
+    <div style={{ position: "relative", height: "100vh", width: "100vw" }}>
       <div style={{
         position: "absolute",
         top: 0,
@@ -195,21 +194,32 @@ function App() {
               zIndex: 2,
             }}
           />
-          <img
-            ref={logoRef}
-            src="/image-asset.png"
-            alt="Brasão PUC-Rio"
+          {iconVisible && (
+            <img
+              ref={iconRef}
+              src="/image-asset.png"
+              alt="Ícone Arrastável"
+              style={{
+                position: "absolute",
+                top: `${iconPosition.y}px`,
+                left: `${iconPosition.x}px`,
+                width: "50px",
+                height: "50px",
+                zIndex: 11,
+              }}
+            />
+          )}
+          <div
             style={{
               position: "absolute",
-              top: `${logoPosition.y}px`,
-              left: `${logoPosition.x}px`,
-              width: "100px",
-              height: "100px",
-              cursor: isDragging ? "grabbing" : "grab",
-              zIndex: 11,
+              top: `${indicatorPosition.y}px`,
+              left: `${indicatorPosition.x}px`,
+              width: "10px",
+              height: "10px",
+              backgroundColor: "blue",
+              borderRadius: "50%",
+              zIndex: 12,
             }}
-            onMouseDown={startDrag}
-            onMouseUp={endDrag}
           />
         </>
       )}
