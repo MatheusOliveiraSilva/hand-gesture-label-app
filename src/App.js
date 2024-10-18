@@ -1,16 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
 import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
-import * as tf from '@tensorflow/tfjs';
 
 function App() {
   const [isWebcamActive, setWebcamActive] = useState(false);
   const [handLandmarker, setHandLandmarker] = useState(null);
-  const [gesturePrediction, setGesturePrediction] = useState(""); // Armazenar a predição do gesto
   const [logoPosition, setLogoPosition] = useState({ x: 100, y: 100 }); // Posição inicial do brasão
   const [isDragging, setIsDragging] = useState(false); // Controle de drag-and-drop
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const modelRef = useRef(null); // Referência ao modelo
   const logoRef = useRef(null); // Referência ao elemento do brasão
 
   // Função para iniciar o MediaPipe Hand Landmarker
@@ -21,7 +18,8 @@ function App() {
       );
       const handLandmarker = await HandLandmarker.createFromOptions(vision, {
         baseOptions: {
-          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
           delegate: "GPU",
         },
         runningMode: "VIDEO",
@@ -30,14 +28,7 @@ function App() {
       setHandLandmarker(handLandmarker);
     };
 
-    // Carregar o modelo do TensorFlow.js
-    const loadModel = async () => {
-      const model = await tf.loadLayersModel('/model_tfjs/model.json');
-      modelRef.current = model;
-    };
-
     initializeHandLandmarker();
-    loadModel(); // Carregar o modelo ao iniciar
   }, []);
 
   // Ativar webcam e aplicar o modelo Hand Landmarker
@@ -49,7 +40,6 @@ function App() {
           videoRef.current.srcObject = stream;
 
           videoRef.current.onloadeddata = () => {
-            // Verificar as dimensões do vídeo e do canvas
             if (videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
               canvasRef.current.width = videoRef.current.videoWidth;
               canvasRef.current.height = videoRef.current.videoHeight;
@@ -64,7 +54,7 @@ function App() {
     }
   }, [isWebcamActive]);
 
-  // Função para detectar mãos e fazer predições de gestos
+  // Função para detectar mãos e desenhar landmarks
   const detectHands = async () => {
     if (!handLandmarker) return;
 
@@ -85,7 +75,6 @@ function App() {
       ctx.strokeStyle = "green";
       ctx.lineWidth = 2;
 
-      // Desenhar os pontos dos landmarks
       landmarks.forEach((landmark) => {
         const x = landmark.x * canvas.width;
         const y = landmark.y * canvas.height;
@@ -94,8 +83,6 @@ function App() {
         ctx.fill();
       });
 
-      // Desenhar as conexões entre os pontos
-      ctx.strokeStyle = "green";
       HAND_CONNECTIONS.forEach(([start, end]) => {
         const xStart = landmarks[start].x * canvas.width;
         const yStart = landmarks[start].y * canvas.height;
@@ -109,35 +96,18 @@ function App() {
       });
     };
 
-    const predictGesture = async (frame) => {
-      if (!modelRef.current) return;
-
-      const imgTensor = tf.browser.fromPixels(frame).resizeNearestNeighbor([224, 224]).expandDims(0).div(255.0);
-      const predictions = await modelRef.current.predict(imgTensor).data();
-      const gestureIndex = predictions.indexOf(Math.max(...predictions));
-
-      const gestures = ["FingerUp", "Open", "Grip"];
-      setGesturePrediction(gestures[gestureIndex]); // Atualiza a predição
-    };
-
     const processFrame = async () => {
       if (!handLandmarker) return;
       const hands = await handLandmarker.detectForVideo(video, Date.now());
 
-      // Limpar o canvas para cada novo frame
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      // Desenhar o vídeo como fundo
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // Desenhar landmarks para todas as mãos detectadas
       if (hands.landmarks.length > 0) {
         hands.landmarks.forEach((landmarks) => {
-          drawLandmarks(landmarks);  // Desenhar landmarks de cada mão
+          drawLandmarks(landmarks);
         });
       }
-
-      // Fazer a predição do gesto usando o frame atual
-      predictGesture(video);
 
       requestAnimationFrame(processFrame);
     };
@@ -146,14 +116,14 @@ function App() {
   };
 
   // Funções de Drag-and-Drop para o brasão
-  const startDrag = (e) => {
+  const startDrag = () => {
     setIsDragging(true);
   };
 
   const handleDrag = (e) => {
     if (isDragging) {
       setLogoPosition({
-        x: e.clientX - 50, // Ajuste para centralizar o brasão no cursor
+        x: e.clientX - 50,
         y: e.clientY - 50,
       });
     }
@@ -164,23 +134,21 @@ function App() {
   };
 
   return (
-    <div style={{ position: 'relative', height: '100vh', width: '100vw' }} onMouseMove={handleDrag} onMouseUp={endDrag}>
-      {/* Header azul marinho */}
+    <div style={{ position: "relative", height: "100vh", width: "100vw" }} onMouseMove={handleDrag} onMouseUp={endDrag}>
       <div style={{
-        position: 'absolute',
+        position: "absolute",
         top: 0,
-        width: '100%',
-        backgroundColor: '#003366',  // Azul marinho
-        color: 'white',
-        textAlign: 'center',
-        padding: '10px',
-        fontSize: '24px',
-        zIndex: 10 // Fingers Landmarking and Understanding Pose Estimation - F.L.U.P.S
+        width: "100%",
+        backgroundColor: "#003366",
+        color: "white",
+        textAlign: "center",
+        padding: "10px",
+        fontSize: "24px",
+        zIndex: 10,
       }}>
         INF - 2473
       </div>
 
-      {/* Vídeo ocupando toda a tela */}
       {!isWebcamActive ? (
         <button
           onClick={() => setWebcamActive(true)}
@@ -196,7 +164,7 @@ function App() {
             top: "50%",
             left: "50%",
             transform: "translate(-50%, -50%)",
-            zIndex: 10
+            zIndex: 10,
           }}
         >
           Autorizar Webcam
@@ -207,42 +175,29 @@ function App() {
             ref={videoRef}
             autoPlay
             style={{
-              position: 'absolute',
+              position: "absolute",
               top: 0,
               left: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover', // Faz o vídeo cobrir toda a tela
-              zIndex: 1
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              zIndex: 1,
             }}
           />
           <canvas
             ref={canvasRef}
             style={{
-              position: 'absolute',
+              position: "absolute",
               top: 0,
               left: 0,
-              width: '100%',
-              height: '100%',
-              zIndex: 2  // O canvas sobrepõe o vídeo
+              width: "100%",
+              height: "100%",
+              zIndex: 2,
             }}
           />
-          {/* Exibir a predição do gesto */}
-          <div style={{
-            position: "absolute",
-            top: "60px",  // Um pouco abaixo do header
-            left: "10px",
-            color: "white",
-            fontSize: "24px",
-            zIndex: 10
-          }}>
-            Predição do Gesto: {gesturePrediction}
-          </div>
-
-          {/* Brasão PUC-Rio com Drag-and-Drop */}
           <img
             ref={logoRef}
-            src="/image-asset.png" // Certifique-se de que o caminho para a imagem está correto
+            src="/image-asset.png"
             alt="Brasão PUC-Rio"
             style={{
               position: "absolute",
@@ -250,8 +205,8 @@ function App() {
               left: `${logoPosition.x}px`,
               width: "100px",
               height: "100px",
-              cursor: isDragging ? "grabbing" : "grab", // Muda o cursor quando estiver arrastando
-              zIndex: 11
+              cursor: isDragging ? "grabbing" : "grab",
+              zIndex: 11,
             }}
             onMouseDown={startDrag}
             onMouseUp={endDrag}
